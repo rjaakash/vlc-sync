@@ -1,5 +1,5 @@
 import json
-from utils import fetch_html, parse_entries, newest, gh
+from utils import fetch_html, parse_entries, newest, find_apk, gh
 
 BASE = {
     "stable": "https://get.videolan.org/vlc-android/",
@@ -14,8 +14,12 @@ changed = []
 
 for ch, url in BASE.items():
     html = fetch_html(url)
-    entries = parse_entries(html)
-    name, dt = newest(entries)
+
+    if ch == "nightly":
+        apk, dt = find_apk(html, False)
+    else:
+        entries = parse_entries(html)
+        name, dt = newest(entries)
 
     now = dt.strftime("%Y%m%d%H%M")
     last = versions.get(ch)

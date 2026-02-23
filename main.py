@@ -13,14 +13,16 @@ channel = os.environ["CHANNEL"]
 base = BASE[channel]
 
 html = fetch_html(base)
-entries = parse_entries(html)
-folder, dt = newest(entries)
+
+if channel == "nightly":
+    folder = ""
+else:
+    entries = parse_entries(html)
+    folder, dt = newest(entries)
 
 now = datetime.now()
 real_tag_time = now.strftime("%Y%m%d-%H%M")
 real_date = now.strftime("%Y-%m-%d")
-
-store = dt.strftime("%Y%m%d%H%M")
 
 if channel == "nightly":
     page = base
@@ -28,8 +30,10 @@ else:
     page = base + folder + "/"
 
 apk_html = fetch_html(page)
-apk = find_apk(apk_html, channel != "nightly")
+apk, dt = find_apk(apk_html, channel != "nightly")
 url = page + apk
+
+store = dt.strftime("%Y%m%d%H%M")
 
 rc = os.system(f"curl -fL '{url}' -o '{apk}'")
 if rc != 0:

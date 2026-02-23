@@ -11,75 +11,98 @@ def fetch_html(url):
 
 def parse_entries(html):
     soup = BeautifulSoup(html, "html.parser")
-    rows = soup.find_all("tr")
     out = []
 
-    for r in rows:
-        cols = r.find_all("td")
-        if len(cols) < 3:
+    for a in soup.find_all("a"):
+        href = a.get("href")
+        if not href or href.startswith("../"):
             continue
 
-        name = cols[1].get_text(strip=True)
-        dt = cols[2].get_text(strip=True)
+        tail = a.next_sibling
+        if not tail:
+            continue
+
+        parts = tail.strip().split()
+        if len(parts) < 2:
+            continue
+
+        dt = " ".join(parts[:2])
 
         try:
-            d = datetime.strptime(dt, "%Y-%m-%d %H:%M")
+            d = datetime.strptime(dt, "%d-%b-%Y %H:%M")
         except:
-            try:
-                d = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-            except:
-                continue
+            continue
 
-        out.append((name, d))
+        out.append((href.strip("/"), d))
 
     return out
 
 def newest(entries):
     if not entries:
         raise RuntimeError("No entries found")
-    return max(entries, key=lambda x: x[1])
+    return max(entries, key=lambda x: (x[1], x[0]))
 
 def find_apk(html, arch=True):
     soup = BeautifulSoup(html, "html.parser")
-    rows = soup.find_all("tr")
     candidates = []
 
-    for r in rows:
-        cols = r.find_all("td")
+    for row in soup.find_all("tr"):
+        cols = row.find_all("td")
         if len(cols) < 3:
             continue
 
-        link = cols[1].find("a")
+        link = cols[0].find("a")
         if not link:
             continue
 
         name = link.get("href")
-        if not name:
+        if not name or not name.lower().endswith(".apk"):
             continue
 
         low = name.lower()
-        if not low.endswith(".apk"):
-            continue
-
         if arch and not ("arm64" in low or "v8a" in low):
             continue
 
-        dt = cols[2].get_text(strip=True)
+        dt_text = cols[2].get_text(strip=True)
 
         try:
-            d = datetime.strptime(dt, "%Y-%m-%d %H:%M")
+            d = datetime.strptime(dt_text, "%d-%b-%Y %H:%M")
         except:
-            try:
-                d = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-            except:
-                continue
+            continue
 
         candidates.append((name, d))
 
     if not candidates:
+        for a in soup.find_all("a"):
+            name = a.get("href")
+            if not name or not name.lower().endswith(".apk"):
+                continue
+
+            low = name.lower()
+            if arch and not ("arm64" in low or "v8a" in low):
+                continue
+
+            tail = a.next_sibling
+            if not tail:
+                continue
+
+            parts = tail.strip().split()
+            if len(parts) < 2:
+                continue
+
+            dt_text = " ".join(parts[:2])
+
+            try:
+                d = datetime.strptime(dt_text, "%d-%b-%Y %H:%M")
+            except:
+                continue
+
+            candidates.append((name, d))
+
+    if not candidates:
         raise RuntimeError("APK not found")
 
-    return max(candidates, key=lambda x: x[1])[0]
+    return max(candidates, key=lambda x: x[1])
 
 def gh(cmd):
     subprocess.run(cmd, check=True)
