@@ -35,16 +35,13 @@ url = page + apk
 
 store = dt.strftime("%Y%m%d%H%M")
 
-rc = os.system(f"curl -fL '{url}' -o '{apk}'")
+rc = os.system(f"curl -fL --retry 5 --retry-delay 5 --retry-connrefused '{url}' -o '{apk}'")
 if rc != 0:
     raise SystemExit("APK download failed")
 
 tag = f"{channel}-{real_tag_time}"
 
-if channel == "nightly":
-    name = f"nightly {real_date}"
-else:
-    name = folder.replace("-", " ")
+name = f"{channel} {real_date}"
 
 create_release(tag, name, channel != "stable")
 upload_asset(tag, apk)
@@ -57,15 +54,13 @@ v[channel] = store
 with open("versions.json", "w") as f:
     json.dump(v, f, indent=2)
 
-if channel == "nightly":
-    msg = f"chore(vlc): {name}"
-else:
-    msg = f"chore(vlc): {channel} {name}"
+msg = f"chore(vlc): {name}"
 
 git_commit(msg)
 
 rels = os.popen("gh release list --json tagName -q '.[].tagName'").read().splitlines()
 
-for r in rels:
-    if r.startswith(channel) and r != tag:
-        delete_release(r)
+same = sorted([r for r in rels if r.startswith(channel)], reverse=True)
+
+for r in same[1:]:
+    delete_release(r)

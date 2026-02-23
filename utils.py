@@ -123,13 +123,23 @@ def delete_release(tag):
 def git_commit(msg):
     gh(["git", "config", "user.name", "github-actions[bot]"])
     gh(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"])
-    gh(["git", "add", "versions.json"])
-    subprocess.run(["git", "commit", "-m", msg], check=False)
 
     for _ in range(5):
-        r = subprocess.run(["git", "push"])
-        if r.returncode == 0:
+        subprocess.run(["git", "pull", "--rebase"], check=False)
+
+        gh(["git", "add", "versions.json"])
+        r = subprocess.run(["git", "commit", "-m", msg])
+
+        subprocess.run([
+            "git",
+            "-c", "rebase.autoStash=true",
+            "-c", "merge.ours.driver=true",
+            "pull",
+            "--rebase"
+        ], check=False)
+
+        p = subprocess.run(["git", "push"])
+        if p.returncode == 0:
             return
-        subprocess.run(["git", "pull", "--rebase"], check=True)
 
     raise SystemExit("git push failed after retries")
