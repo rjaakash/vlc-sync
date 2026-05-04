@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "6 7 * * *"
+      timezone: "Asia/Kolkata"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      nightly_update_available: ${{ steps.run_check.outputs.nightly_update_available }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install Dependencies
+        run: pip install beautifulsoup4
+
+      - name: Check for Nightly Update
+        id: run_check
+        run: |
+          output=$(python3 scripts/check.py)
+          echo "$output" >> $GITHUB_OUTPUT
+
+      - name: Cleanup Old Workflow Runs
+        run: |
+          set -e
+          workflow_run_ids=$(gh run list --limit 200 --json databaseId -q '.[].databaseId')
+          run_count=0
+          for run_id in $workflow_run_ids; do
+            run_count=$((run_count+1))
+            if [ $run_count -gt 10 ]; then
+              gh run delete "$run_id"
+            fi
+          done
+
+  release:
+    runs-on: ubuntu-latest
+    needs: check
+    if: needs.check.outputs.nightly_update_available == 'true'
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install Dependencies
+        run: pip install beautifulsoup4
+
+      - name: Run Release
+        run: python3 scripts/release.py

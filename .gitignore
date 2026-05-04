@@ -9,3 +9,5 @@ env/
 ENV/
 
 *.apk
+*.log
+.DS_Store
